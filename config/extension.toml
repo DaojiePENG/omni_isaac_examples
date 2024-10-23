@@ -87,6 +87,9 @@ name = "omni.isaac.examples.franka_cortex"
 [[python.module]]
 name = "omni.isaac.examples.humanoid"
 
+[[python.module]]
+name = "omni.isaac.examples.go2"
+
 [[test]]
 timeout = 1200
 
