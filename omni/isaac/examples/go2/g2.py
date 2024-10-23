@@ -24,19 +24,19 @@ from omni.isaac.nucleus import get_assets_root_path
 from pxr import Gf
 
 
-class H1FlatTerrainPolicy:
-    """The H1 Humanoid running Flat Terrain Policy Locomotion Policy"""
+class Go2FlatTerrainPolicy:
+    """The Go2 Quadruped running Flat Terrain Policy Locomotion Policy"""
 
     def __init__(
         self,
         prim_path: str,
-        name: str = "h1",
+        name: str = "go2",
         usd_path: Optional[str] = None,
         position: Optional[np.ndarray] = None,
         orientation: Optional[np.ndarray] = None,
     ) -> None:
         """
-        Initialize H1 robot and import flat terrain policy.
+        Initialize Go2 robot and import flat terrain policy.
 
         Args:
             prim_path {str} -- prim path of the robot on the stage
@@ -58,7 +58,8 @@ class H1FlatTerrainPolicy:
                 if assets_root_path is None:
                     carb.log_error("Could not find Isaac Sim assets folder")
 
-                asset_path = assets_root_path + "/Isaac/Robots/Unitree/H1/h1.usd"
+                # asset_path = assets_root_path + "/Isaac/Robots/Unitree/H1/h1.usd"
+                asset_path = assets_root_path + "/Isaac/Robots/Unitree/Go2/go2.usd"
 
                 prim.GetReferences().AddReference(asset_path)
 
@@ -67,35 +68,36 @@ class H1FlatTerrainPolicy:
         self._dof_control_modes: List[int] = list()
 
         # Policy
-        file_content = omni.client.read_file(assets_root_path + "/Isaac/Samples/Quadruped/H1_Policies/h1_policy.pt")[2]
+        file_content = omni.client.read_file(assets_root_path + "/Isaac/Samples/Quadruped/Go2_Policies/go2_flat.pt")[2]
         file = io.BytesIO(memoryview(file_content).tobytes())
 
         self._policy = torch.jit.load(file)
         self._base_vel_lin_scale = 1
         self._base_vel_ang_scale = 1
         self._action_scale = 0.5
-        self._default_joint_pos = [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.28,
-            0.28,
-            -0.28,
-            -0.28,
-            0.0,
-            0.0,
-            0.79,
-            0.79,
-            0.0,
-            0.0,
-            -0.52,
-            -0.52,
-            0.52,
-            0.52,
-        ]
-        self._previous_action = np.zeros(19)
+        self._default_joint_pos = self.robot.data.default_joint_pos
+        # self._default_joint_pos = [
+        #     0.0,
+        #     0.0,
+        #     0.0,
+        #     0.0,
+        #     0.0,
+        #     0.28,
+        #     0.28,
+        #     -0.28,
+        #     -0.28,
+        #     0.0,
+        #     0.0,
+        #     0.79,
+        #     0.79,
+        #     0.0,
+        #     0.0,
+        #     -0.52,
+        #     -0.52,
+        #     0.52,
+        #     0.52,
+        # ]
+        self._previous_action = np.zeros(12)
         self._policy_counter = 0
 
     def _compute_observation(self, command):
@@ -119,7 +121,7 @@ class H1FlatTerrainPolicy:
         ang_vel_b = np.matmul(R_BI, ang_vel_I)
         gravity_b = np.matmul(R_BI, np.array([0.0, 0.0, -1.0]))
 
-        obs = np.zeros(69)
+        obs = np.zeros(48)
         # Base lin vel
         obs[:3] = self._base_vel_lin_scale * lin_vel_b
         # Base ang vel
@@ -133,10 +135,10 @@ class H1FlatTerrainPolicy:
         # Joint states
         current_joint_pos = self.robot.get_joint_positions()
         current_joint_vel = self.robot.get_joint_velocities()
-        obs[12:31] = current_joint_pos - self._default_joint_pos
-        obs[31:50] = current_joint_vel
+        obs[12:24] = current_joint_pos - self._default_joint_pos
+        obs[24:36] = current_joint_vel
         # Previous Action
-        obs[50:69] = self._previous_action
+        obs[36:48] = self._previous_action
 
         return obs
 
@@ -175,12 +177,12 @@ class H1FlatTerrainPolicy:
         #  'left_shoulder_pitch_joint', 'right_shoulder_pitch_joint', 'left_hip_pitch_joint', 'right_hip_pitch_joint',
         #  'left_shoulder_roll_joint', 'right_shoulder_roll_joint', 'left_knee_joint', 'right_knee_joint',
         # 'left_shoulder_yaw_joint', 'right_shoulder_yaw_joint', 'left_ankle_joint', 'right_ankle_joint', 'left_elbow_joint', 'right_elbow_joint']
-        stiffness = np.array([150, 150, 200, 150, 150, 40, 40, 200, 200, 40, 40, 200, 200, 40, 40, 20, 20, 40, 40])
-        damping = np.array([5, 5, 5, 5, 5, 10, 10, 5, 5, 10, 10, 5, 5, 10, 10, 4, 4, 10, 10])
+        stiffness = np.array([25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25])
+        damping = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
         max_effort = np.array(
-            [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 100, 100, 300, 300]
+            [23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5]
         )
-        max_vel = np.zeros(19) + 100.0
+        max_vel = np.zeros(12) + 30.0
         self.robot._articulation_view.set_gains(stiffness, damping)
         self.robot._articulation_view.set_max_efforts(max_effort)
         self.robot._articulation_view.set_max_joint_velocities(max_vel)

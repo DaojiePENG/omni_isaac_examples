@@ -10,7 +10,7 @@
 import os
 
 from omni.isaac.examples.base_sample import BaseSampleExtension
-from omni.isaac.examples.go2 import HumanoidExample
+from omni.isaac.examples.go2 import Go2Example
 
 
 class Go2ExampleExtension(BaseSampleExtension):
@@ -20,6 +20,7 @@ class Go2ExampleExtension(BaseSampleExtension):
         overview = "This Example shows an Unitree Go2 running a flat terrain policy trained in Isaac Lab"
         overview += "\n\tKeybord Input:"
         overview += "\n\t\tup arrow / numpad 8: Move Forward"
+        overview += "\n\t\down arrow / numpad 2: Move Backward"
         overview += "\n\t\tleft arrow/ numpad 4: Spin Counterclockwise"
         overview += "\n\t\tright arrow / numpad 6: Spin Clockwise"
         overview += "\n\nPress the 'Open in IDE' button to view the source code."
@@ -27,10 +28,10 @@ class Go2ExampleExtension(BaseSampleExtension):
         super().start_extension(
             menu_name="tian",
             submenu_name="",
-            name="Go2",
+            name="QuadrupedGo2",
             title="Unitree Go2 Example",
             doc_link="https://docs.omniverse.nvidia.com/isaacsim/latest/isaac_lab_tutorials/tutorial_policy_deployment.html",
             overview=overview,
             file_path=os.path.abspath(__file__),
-            sample=HumanoidExample(),
+            sample=Go2Example(),
         )

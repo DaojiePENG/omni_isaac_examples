@@ -12,10 +12,9 @@ import numpy as np
 import omni
 import omni.appwindow  # Contains handle to keyboard
 from omni.isaac.examples.base_sample import BaseSample
-from omni.isaac.examples.humanoid.h1 import H1FlatTerrainPolicy
+from omni.isaac.examples.go2.g2 import Go2FlatTerrainPolicy
 
-
-class HumanoidExample(BaseSample):
+class Go2Example(BaseSample):
     def __init__(self) -> None:
         super().__init__()
         self._world_settings["stage_units_in_meters"] = 1.0
@@ -28,6 +27,9 @@ class HumanoidExample(BaseSample):
             # forward command
             "NUMPAD_8": [0.75, 0.0, 0.0],
             "UP": [0.75, 0.0, 0.0],
+            # backward command
+            "NUMPAD_2": [-0.75, 0.0, 0.0],
+            "DOWN": [-0.75, 0.0, 0.0],
             # yaw command (positive)
             "NUMPAD_4": [0.0, 0.0, 0.75],
             "LEFT": [0.0, 0.0, 0.75],
@@ -47,9 +49,9 @@ class HumanoidExample(BaseSample):
             restitution=0.01,
         )
 
-        self.h1 = H1FlatTerrainPolicy(
-            prim_path="/World/H1",
-            name="H1",
+        self.go2 = Go2FlatTerrainPolicy(
+            prim_path="/World/Go2",
+            name="Go2",
             position=np.array([0, 0, 1.05]),
         )
 
@@ -66,18 +68,18 @@ class HumanoidExample(BaseSample):
             int(omni.timeline.TimelineEventType.STOP), self._timeline_timer_callback_fn
         )
         await world.play_async()
-        self.h1.initialize()
+        self.go2.initialize()
 
     async def setup_post_reset(self) -> None:
-        self.h1.post_reset()
+        self.go2.post_reset()
         world = self.get_world()
         self._physics_ready = False
         await world.play_async()
-        self.h1.initialize()
+        self.go2.initialize()
 
     def on_physics_step(self, step_size) -> None:
         if self._physics_ready:
-            self.h1.advance(step_size, self._base_command)
+            self.go2.advance(step_size, self._base_command)
         else:
             self._physics_ready = True
 
@@ -96,8 +98,8 @@ class HumanoidExample(BaseSample):
         return True
 
     def _timeline_timer_callback_fn(self, event) -> None:
-        if self.h1:
-            self.h1.post_reset()
+        if self.go2:
+            self.go2.post_reset()
 
     def world_cleanup(self):
         world = self.get_world()
