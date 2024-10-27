@@ -9,6 +9,6 @@
 
 # NOTE: Import here your extension examples to be propagated to ISAAC SIM Extensions startup
 
-from omni.isaac.examples.go2.g2 import Go2FlatTerrainPolicy
+from omni.isaac.examples.go2.go2_flat import Go2FlatTerrainPolicy
 from omni.isaac.examples.go2.go2_example import Go2Example
 from omni.isaac.examples.go2.go2_example_extension import Go2ExampleExtension

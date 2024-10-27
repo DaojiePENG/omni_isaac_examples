@@ -17,7 +17,7 @@ import omni.kit.commands
 import torch
 from omni.isaac.core.articulations import Articulation
 from omni.isaac.core.utils.prims import define_prim, get_prim_at_path
-from omni.isaac.core.utils.rotations import quat_to_rot_matrix
+from omni.isaac.core.utils.rotations import euler_to_rot_matrix, quat_to_euler_angles, quat_to_rot_matrix
 from omni.isaac.core.utils.stage import get_current_stage
 from omni.isaac.core.utils.types import ArticulationAction
 from omni.isaac.nucleus import get_assets_root_path
@@ -25,7 +25,7 @@ from pxr import Gf
 
 
 class Go2FlatTerrainPolicy:
-    """The Go2 Quadruped running Flat Terrain Policy Locomotion Policy"""
+    """The Go2 quadruped"""
 
     def __init__(
         self,
@@ -36,7 +36,7 @@ class Go2FlatTerrainPolicy:
         orientation: Optional[np.ndarray] = None,
     ) -> None:
         """
-        Initialize Go2 robot and import flat terrain policy.
+        Initialize robot and load RL policy.
 
         Args:
             prim_path {str} -- prim path of the robot on the stage
@@ -49,6 +49,7 @@ class Go2FlatTerrainPolicy:
         self._stage = get_current_stage()
         self._prim_path = prim_path
         prim = get_prim_at_path(self._prim_path)
+
         assets_root_path = get_assets_root_path()
         if not prim.IsValid():
             prim = define_prim(self._prim_path, "Xform")
@@ -58,8 +59,7 @@ class Go2FlatTerrainPolicy:
                 if assets_root_path is None:
                     carb.log_error("Could not find Isaac Sim assets folder")
 
-                # asset_path = assets_root_path + "/Isaac/Robots/Unitree/H1/h1.usd"
-                asset_path = assets_root_path + "/Isaac/Robots/Unitree/Go2/go2.usd"
+                asset_path = assets_root_path + "/Isaac/IsaacLab/Robots/Unitree/Go2/go2.usd"
 
                 prim.GetReferences().AddReference(asset_path)
 
@@ -68,41 +68,23 @@ class Go2FlatTerrainPolicy:
         self._dof_control_modes: List[int] = list()
 
         # Policy
-        file_content = omni.client.read_file(assets_root_path + "/Isaac/Samples/Quadruped/Go2_Policies/go2_flat.pt")[2]
+        file_content = omni.client.read_file(
+            assets_root_path + "/Isaac/Samples/Quadruped/Go2_Policies/policy.pt"
+        )[2]
         file = io.BytesIO(memoryview(file_content).tobytes())
 
         self._policy = torch.jit.load(file)
         self._base_vel_lin_scale = 1
         self._base_vel_ang_scale = 1
-        self._action_scale = 0.5
-        self._default_joint_pos = self.robot.data.default_joint_pos
-        # self._default_joint_pos = [
-        #     0.0,
-        #     0.0,
-        #     0.0,
-        #     0.0,
-        #     0.0,
-        #     0.28,
-        #     0.28,
-        #     -0.28,
-        #     -0.28,
-        #     0.0,
-        #     0.0,
-        #     0.79,
-        #     0.79,
-        #     0.0,
-        #     0.0,
-        #     -0.52,
-        #     -0.52,
-        #     0.52,
-        #     0.52,
-        # ]
+        self._action_scale = 0.25
+        self._default_joint_pos = np.array([0.1, -0.1, 0.1, -0.1, 0.8, 0.8, 1.0, 1.0, -1.5, -1.5, -1.5, -1.5])
         self._previous_action = np.zeros(12)
         self._policy_counter = 0
+        self._decimation = 4
 
     def _compute_observation(self, command):
         """
-        Compute the observation vector for the policy.
+        Compute the observation vector for the policy
 
         Argument:
         command {np.ndarray} -- the robot command (v_x, v_y, w_z)
@@ -144,14 +126,14 @@ class Go2FlatTerrainPolicy:
 
     def advance(self, dt, command):
         """
-        Compute the desired articulation action and apply them to the robot articulation.
+        Compute the desired torques and apply them to the articulation
 
         Argument:
         dt {float} -- Timestep update in the world.
         command {np.ndarray} -- the robot command (v_x, v_y, w_z)
 
         """
-        if self._policy_counter % 4 == 0:
+        if self._policy_counter % self._decimation == 0:
             obs = self._compute_observation(command)
             with torch.no_grad():
                 obs = torch.from_numpy(obs).view(1, -1).float()
@@ -165,30 +147,18 @@ class Go2FlatTerrainPolicy:
 
     def initialize(self, physics_sim_view=None) -> None:
         """
-        Initialize the articulation interface, set up robot drive mode,
+        Initialize robot the articulation interface, set up drive mode
         """
         self.robot.initialize(physics_sim_view=physics_sim_view)
+        print('*' * 100)
+        print(str(self.robot.dof_names))
+        print('*' * 100)
         self.robot.get_articulation_controller().set_effort_modes("force")
         self.robot.get_articulation_controller().switch_control_mode("position")
-        # initialize robot parameter, set joint properties based on the values from env param
-
-        # H1 joint order
-        # ['left_hip_yaw_joint', 'right_hip_yaw_joint', 'torso_joint', 'left_hip_roll_joint', 'right_hip_roll_joint',
-        #  'left_shoulder_pitch_joint', 'right_shoulder_pitch_joint', 'left_hip_pitch_joint', 'right_hip_pitch_joint',
-        #  'left_shoulder_roll_joint', 'right_shoulder_roll_joint', 'left_knee_joint', 'right_knee_joint',
-        # 'left_shoulder_yaw_joint', 'right_shoulder_yaw_joint', 'left_ankle_joint', 'right_ankle_joint', 'left_elbow_joint', 'right_elbow_joint']
-        stiffness = np.array([25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25])
-        damping = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
-        max_effort = np.array(
-            [23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5, 23.5]
-        )
-        max_vel = np.zeros(12) + 30.0
-        self.robot._articulation_view.set_gains(stiffness, damping)
-        self.robot._articulation_view.set_max_efforts(max_effort)
-        self.robot._articulation_view.set_max_joint_velocities(max_vel)
+        self.robot._articulation_view.set_gains(np.zeros(12) + 45, np.zeros(12) + 0.5)
 
     def post_reset(self) -> None:
         """
-        Post Reset robot articulation
+        Post reset articulation
         """
         self.robot.post_reset()

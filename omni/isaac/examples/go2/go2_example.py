@@ -12,7 +12,8 @@ import numpy as np
 import omni
 import omni.appwindow  # Contains handle to keyboard
 from omni.isaac.examples.base_sample import BaseSample
-from omni.isaac.examples.go2.g2 import Go2FlatTerrainPolicy
+from omni.isaac.examples.go2.go2_flat import Go2FlatTerrainPolicy
+
 
 class Go2Example(BaseSample):
     def __init__(self) -> None:
@@ -20,27 +21,32 @@ class Go2Example(BaseSample):
         self._world_settings["stage_units_in_meters"] = 1.0
         self._world_settings["physics_dt"] = 1.0 / 200.0
         self._world_settings["rendering_dt"] = 8.0 / 200.0
-        self._enter_toggled = 0
         self._base_command = [0.0, 0.0, 0.0]
+
         # bindings for keyboard to command
         self._input_keyboard_mapping = {
             # forward command
-            "NUMPAD_8": [0.75, 0.0, 0.0],
-            "UP": [0.75, 0.0, 0.0],
-            # backward command
-            "NUMPAD_2": [-0.75, 0.0, 0.0],
-            "DOWN": [-0.75, 0.0, 0.0],
+            "NUMPAD_8": [1.0, 0.0, 0.0],
+            "UP": [1.0, 0.0, 0.0],
+            # back command
+            "NUMPAD_2": [-1.0, 0.0, 0.0],
+            "DOWN": [-1.0, 0.0, 0.0],
+            # left command
+            "NUMPAD_6": [0.0, -0.5, 0.0],
+            "RIGHT": [0.0, -0.5, 0.0],
+            # right command
+            "NUMPAD_4": [0.0, 0.5, 0.0],
+            "LEFT": [0.0, 0.5, 0.0],
             # yaw command (positive)
-            "NUMPAD_4": [0.0, 0.0, 0.75],
-            "LEFT": [0.0, 0.0, 0.75],
+            "NUMPAD_7": [0.0, 0.0, 2.0],
+            "N": [0.0, 0.0, 2.0],
             # yaw command (negative)
-            "NUMPAD_6": [0.0, 0.0, -0.75],
-            "RIGHT": [0.0, 0.0, -0.75],
+            "NUMPAD_9": [0.0, 0.0, -2.0],
+            "M": [0.0, 0.0, -2.0],
         }
 
     def setup_scene(self) -> None:
-        world = self.get_world()
-        world.scene.add_default_ground_plane(
+        self._world.scene.add_default_ground_plane(
             z_position=0,
             name="default_ground_plane",
             prim_path="/World/defaultGroundPlane",
@@ -48,43 +54,41 @@ class Go2Example(BaseSample):
             dynamic_friction=0.2,
             restitution=0.01,
         )
-
         self.go2 = Go2FlatTerrainPolicy(
             prim_path="/World/Go2",
             name="Go2",
-            position=np.array([0, 0, 1.05]),
+            position=np.array([0, 0, 0.8]),
         )
-
-    async def setup_post_load(self) -> None:
-        world = self.get_world()
-        self._appwindow = omni.appwindow.get_default_app_window()
-        self._input = carb.input.acquire_input_interface()
-        self._keyboard = self._appwindow.get_keyboard()
-        self._sub_keyboard = self._input.subscribe_to_keyboard_events(self._keyboard, self._sub_keyboard_event)
-        self._physics_ready = False
-        world.add_physics_callback("physics_step", callback_fn=self.on_physics_step)
         timeline = omni.timeline.get_timeline_interface()
         self._event_timer_callback = timeline.get_timeline_event_stream().create_subscription_to_pop_by_type(
             int(omni.timeline.TimelineEventType.STOP), self._timeline_timer_callback_fn
         )
-        await world.play_async()
+        self.go2.robot.set_joints_default_state(self.go2._default_joint_pos)
+
+    async def setup_post_load(self) -> None:
+        self._appwindow = omni.appwindow.get_default_app_window()
+        self._input = carb.input.acquire_input_interface()
+        self._keyboard = self._appwindow.get_keyboard()
+        self._sub_keyboard = self._input.subscribe_to_keyboard_events(self._keyboard, self._sub_keyboard_event)
+        self._world.add_physics_callback("physics_step", callback_fn=self.on_physics_step)
+        self._physics_ready = False
+        await self._world.play_async()
         self.go2.initialize()
 
     async def setup_post_reset(self) -> None:
-        self.go2.post_reset()
-        world = self.get_world()
+        await self._world.play_async()
         self._physics_ready = False
-        await world.play_async()
         self.go2.initialize()
 
     def on_physics_step(self, step_size) -> None:
-        if self._physics_ready:
+        if self._physics_ready == True:
             self.go2.advance(step_size, self._base_command)
         else:
             self._physics_ready = True
 
     def _sub_keyboard_event(self, event, *args, **kwargs) -> bool:
         """Subscriber callback to when kit is updated."""
+
         # when a key is pressedor released  the command is adjusted w.r.t the key-mapping
         if event.type == carb.input.KeyboardEventType.KEY_PRESS:
             # on pressing, the command is incremented
@@ -100,9 +104,9 @@ class Go2Example(BaseSample):
     def _timeline_timer_callback_fn(self, event) -> None:
         if self.go2:
             self.go2.post_reset()
+            self._physics_ready = False
 
     def world_cleanup(self):
-        world = self.get_world()
         self._event_timer_callback = None
-        if world.physics_callback_exists("physics_step"):
-            world.remove_physics_callback("physics_step")
+        if self._world.physics_callback_exists("physics_step"):
+            self._world.remove_physics_callback("physics_step")
