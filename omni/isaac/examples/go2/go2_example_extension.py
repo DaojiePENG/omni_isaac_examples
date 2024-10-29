@@ -26,7 +26,7 @@ class Go2ExampleExtension(BaseSampleExtension):
         overview += "\n\nPress the 'Open in IDE' button to view the source code."
 
         super().start_extension(
-            menu_name="",
+            menu_name="PDJ",
             submenu_name="",
             name="QuadrupedGo2",
             title="Unitree Go2 Example",

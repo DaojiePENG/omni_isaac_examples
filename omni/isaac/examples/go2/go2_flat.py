@@ -22,7 +22,9 @@ from omni.isaac.core.utils.stage import get_current_stage
 from omni.isaac.core.utils.types import ArticulationAction
 from omni.isaac.nucleus import get_assets_root_path
 from pxr import Gf
+import os
 
+current_directory = os.path.dirname(__file__)
 
 class Go2FlatTerrainPolicy:
     """The Go2 quadruped"""
@@ -68,8 +70,10 @@ class Go2FlatTerrainPolicy:
         self._dof_control_modes: List[int] = list()
 
         # Policy
+        policy_dir = current_directory + "/Go2_Policies/policy.pt"
         file_content = omni.client.read_file(
-            assets_root_path + "/Isaac/Samples/Quadruped/Go2_Policies/policy.pt"
+            # assets_root_path + "/Isaac/Samples/Quadruped/Go2_Policies/policy.pt"
+            policy_dir
         )[2]
         file = io.BytesIO(memoryview(file_content).tobytes())
 
